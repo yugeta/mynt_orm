@@ -191,9 +191,9 @@ SQL;
     }
 
     return [
-      "data"  => $res ? $res[0] : null,
-      "datas" => $res ? $res[0] : null,
-      "sql"   => [$query],
+      // "data"  => $res ? $res[0] : null,
+      "datas" => $res,
+      "sql"   => $query,
       "latest_id" => $last_id,
     ];
   }
@@ -233,8 +233,9 @@ __SQL__;
     }
 
     return [
-      "datas" => $res ? $res : null,
-      "sql"   => [$query,$search_query],
+      "datas"  => $res ? $res : null,
+      "sql"    => $query,
+      "select" => $search_query,
     ];
   }
 
@@ -282,7 +283,7 @@ __SQL__;
       switch (true){
         // 整数
         case preg_match('/^int/i', $type):
-          if(!$value || $value === "null"){
+          if($value === "" || $value === "null"){
             return null;
           }
           else{
