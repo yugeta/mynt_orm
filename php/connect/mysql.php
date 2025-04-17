@@ -145,7 +145,8 @@ SQL;
       die($e->getMessage());
     }
     $datas = [];
-    if($res){
+    // if($res){
+    if($res instanceof PDOStatement){
       foreach ($res as $val){
         $datas[] = $val;
       }
