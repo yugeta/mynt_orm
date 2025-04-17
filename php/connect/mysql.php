@@ -145,21 +145,20 @@ SQL;
       // die($e->getMessage());
       $res = null;
     }
-    return $res;
-    // $datas = [];
-    // try {
-    //   // if(is_iterable($res)){ // php7.1以降で対応
-    //   // if($res){ // falseを扱えない場合あり php5.4の場合
-    //   if ($res instanceof PDOStatement) {
-    //     foreach ($res as $val){
-    //       $datas[] = $val;
-    //     }
-    //   }
-    // }
-    // catch(Exception $e){
-    //   die($e->getMessage());
-    // }
-    // return $datas;
+    $datas = [];
+    try {
+      // if(is_iterable($res)){ // php7.1以降で対応
+      if($res && $res !== false){ // falseを扱えない場合あり php5.4の場合
+      // if ($res instanceof PDOStatement) {
+        foreach ($res as $val){
+          $datas[] = $val;
+        }
+      }
+    }
+    catch(Exception $e){
+      die($e->getMessage());
+    }
+    return $datas;
   }
 
   function insert($table="", $hashes=[], $timeout=null){
