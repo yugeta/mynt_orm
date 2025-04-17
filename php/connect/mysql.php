@@ -145,11 +145,15 @@ SQL;
       die($e->getMessage());
     }
     $datas = [];
-    // if($res){
-    if($res instanceof PDOStatement){
-      foreach ($res as $val){
-        $datas[] = $val;
+    try {
+      if($res instanceof PDOStatement){
+        foreach ($res as $val){
+          $datas[] = $val;
+        }
       }
+    }
+    catch(Exception $e){
+      die($e->getMessage());
     }
     return $datas;
   }
