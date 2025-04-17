@@ -142,20 +142,24 @@ SQL;
     }
     catch(Exception $e){
       echo $query_string . PHP_EOL;
-      die($e->getMessage());
+      // die($e->getMessage());
+      $res = null;
     }
-    $datas = [];
-    try {
-      if(is_iterable($res)){
-        foreach ($res as $val){
-          $datas[] = $val;
-        }
-      }
-    }
-    catch(Exception $e){
-      die($e->getMessage());
-    }
-    return $datas;
+    return $res;
+    // $datas = [];
+    // try {
+    //   // if(is_iterable($res)){ // php7.1以降で対応
+    //   // if($res){ // falseを扱えない場合あり php5.4の場合
+    //   if ($res instanceof PDOStatement) {
+    //     foreach ($res as $val){
+    //       $datas[] = $val;
+    //     }
+    //   }
+    // }
+    // catch(Exception $e){
+    //   die($e->getMessage());
+    // }
+    // return $datas;
   }
 
   function insert($table="", $hashes=[], $timeout=null){
