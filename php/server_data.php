@@ -2,6 +2,7 @@
 
 class ServerData{
   function __construct($server_name=null){
+    $this->dir = __DIR__ ."/../data/";
     if($server_name){
       $this->data = $this->get_server_data($server_name);
     }
@@ -13,7 +14,7 @@ class ServerData{
   var $datas = [];
   var $data  = [];
   // var $path  = __DIR__ ."/../../../data/setting_database.json";
-  var $dir   = __DIR__ ."/../data/";
+  var $dir   = null;
   var $json  = null;
 
   /**
