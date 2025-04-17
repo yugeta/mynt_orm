@@ -146,7 +146,7 @@ SQL;
     }
     $datas = [];
     try {
-      if($res instanceof PDOStatement){
+      if(is_iterable($res)){
         foreach ($res as $val){
           $datas[] = $val;
         }
