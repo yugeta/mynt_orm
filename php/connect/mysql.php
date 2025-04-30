@@ -88,11 +88,12 @@ class Mysql{
 SELECT {$replacement_string}
 FROM information_schema.tables 
 WHERE TABLE_SCHEMA = "{$database_name}"
-ORDER BY TABLE_NAME
 SQL;
     if($narrow_down){
       $query .= " AND TABLE_NAME LIKE '%{$narrow_down}%'";
     }
+
+    $query .= "\nORDER BY TABLE_NAME";
     
     // Lists
     $query_lists = str_replace($replacement_string, "TABLE_NAME as name", $query);
