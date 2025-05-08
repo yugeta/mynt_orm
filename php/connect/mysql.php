@@ -289,39 +289,67 @@ __SQL__;
       $type  = $res ? strtolower($res[0]["Type"]) : null;
     }
     if($res){
-      switch (true){
-        // 整数
-        case preg_match('/^int/i', $type):
-          if($value === "" || $value === "null"){
-            return null;
-          }
-          else{
-            return (int)$value;
-          }
+    //   switch (true){
+    //     // 整数
+    //     case preg_match('/^int/i', $type):
+    //       if($value === "" || $value === "null" || $value === null){
+    //         return null;
+    //       }
+    //       else{
+    //         return (int)$value;
+    //       }
 
-        // 浮動小数
-        case preg_match('/^float|^double|^decimal|^numeric/i', $type):
-          if($value === "" || $value === "null"){
-            return null;
-          }
-          else{
-            return (float)$value;
-          }
+    //     // 浮動小数
+    //     case preg_match('/^float|^double|^decimal|^numeric/i', $type):
+    //       if($value === "" || $value === "null"){
+    //         return null;
+    //       }
+    //       else{
+    //         return (float)$value;
+    //       }
     
+    //     // 文字列
+    //     case preg_match('/^varchar|^char|^text|^tinytext|^mediumtext|^longtext/i', $type):
+    //       return (string)$value ?: null;
+    
+    //     // 日付/時間型
+    //     case preg_match('/^date|^datetime|^timestamp|^time|^year/i', $type):
+    //       return $value ?: null;
+    
+    //     case preg_match('/^tinyint\(1\)/i', $type):
+    //       return $value ? true : false;
+    
+    //     case preg_match('/^blob|^tinyblob|^mediumblob|^longblob/i', $type):
+    //       return $value;
+    
+    //     default:
+    //       return $value;
+    //   }
+      switch (true) {
+        // boolean (tinyint(1))
+        case preg_match('/^tinyint\(1\)$/i', $type):
+          return (int)$value === 1;
+      
+        // 整数（int, tinyint, smallint, mediumint, bigint）
+        case preg_match('/^(tinyint|smallint|mediumint|int|bigint)(\(\d+\))?/i', $type):
+          return ($value === "" || $value === "null" || $value === null) ? null : (int)$value;
+      
+        // 浮動小数（float, double, decimal, numeric）
+        case preg_match('/^(float|double|decimal|numeric)(\(\d+,\d+\))?/i', $type):
+          return ($value === "" || $value === "null" || $value === null) ? null : (float)$value;
+      
         // 文字列
-        case preg_match('/^varchar|^char|^text|^tinytext|^mediumtext|^longtext/i', $type):
-          return (string)$value ?: null;
-    
-        // 日付/時間型
-        case preg_match('/^date|^datetime|^timestamp|^time|^year/i', $type):
-          return $value ?: null;
-    
-        case preg_match('/^tinyint\(1\)/i', $type):
-          return $value ? true : false;
-    
-        case preg_match('/^blob|^tinyblob|^mediumblob|^longblob/i', $type):
+        case preg_match('/^(varchar|char|text|tinytext|mediumtext|longtext)/i', $type):
+          return ($value === "" || $value === "null" || $value === null) ? null : (string)$value;
+      
+        // 日付・時間
+        case preg_match('/^(date|datetime|timestamp|time|year)/i', $type):
+          return ($value === "" || $value === "null" || $value === null) ? null : $value;
+      
+        // BLOB
+        case preg_match('/^(blob|tinyblob|mediumblob|longblob)/i', $type):
           return $value;
-    
+      
         default:
           return $value;
       }
