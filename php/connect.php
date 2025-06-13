@@ -154,6 +154,9 @@ class Connect{
   function insert($table_name=null, $data=[], $timeout=null){
     return $this->sql->insert($table_name, $data, $timeout);
   }
+  function insert_bulk(string $table_name, array  $datas, $chunk=100000, $timeout=1000){
+    return $this->sql->insert_bulk($table_name, $datas, $chunk, $timeout);
+  }
 
   /**
    * update

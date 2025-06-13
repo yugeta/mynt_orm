@@ -216,6 +216,13 @@ SQL;
     ];
   }
 
+  function insert_bulk($table="", $hashes=[], $timeout=null){
+    return [
+      "datas" => null,
+      "query" => null,
+    ];
+  }
+
 
   function update($table="", $hashes=[] , $where="", $timeout=null){
     if(!isset($hashes["update_at"])){

@@ -207,6 +207,63 @@ SQL;
     ];
   }
 
+  // 大量insertの場合に、まとめて登録できる処理
+  // ex) $datas = [[id=>1,name="foo",memo="bar"],[id=>2,name="foo",memo="bar"]]
+  function insert_bulk(string $table="", array $datas=[], int $chunkSize = 1000, $timeout=null){
+    try{
+      if(!$table || !$datas){return;}
+      $this->dbh->beginTransaction(); // トランザクション開始
+      // $timeout = $timeout ? $timeout : 1000;
+      $total = count($datas);
+      $res = [];
+      $sql_arr = [];
+      $latest_id = null;
+
+      for ($i = 0; $i < $total; $i += $chunkSize) {
+        $chunk = array_slice($datas, $i, $chunkSize);
+        if (empty($chunk)) continue;
+
+        $placeholders = [];
+        $values = [];
+        $columns = array_keys($chunk[0]);
+
+        foreach ($chunk as $row) {
+          $placeholders[] = '(' . implode(',', array_fill(0, count($columns), '?')) . ')';
+          foreach ($columns as $col) {
+            $values[] = $row[$col];
+          }
+        }
+
+        $sql = "INSERT INTO {$table} (" . implode(',', $columns) . ") VALUES " . implode(', ', $placeholders);
+        $sql_arr[] = $sql;
+        $stmt = $this->dbh->prepare($sql);
+        $res[] = $stmt->execute($values);
+
+        if ($latest_id === null) {
+          $latest_id = $this->dbh->lastInsertId(); // 最初のIDだけ保存
+        }
+
+        // 負荷軽減のために少し待機（例：0.1秒）
+        usleep(100000);
+      }
+      $this->dbh->commit();
+    }
+
+    catch(Exception $e){
+      if ($this->dbh->inTransaction()) {
+        $this->dbh->rollBack();
+      }
+      error_log("insert_bulk error: " . $e->getMessage());
+      // return false; // エラー時は false を返すなども有効
+    }
+
+    return [
+      "datas" => $res ? $datas : [],
+      "sql"   => $sql_arr,
+      "latest_id" => $this->dbh->lastInsertId(),
+    ];
+  }
+
   function update($table="", $hashes=[], $where=null, $timeout=null){
     if(!isset($hashes["update_at"])){
       $hashes["update_at"] = date("Y-m-d H:i:s");
