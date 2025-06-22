@@ -209,7 +209,7 @@ SQL;
 
   // 大量insertの場合に、まとめて登録できる処理
   // ex) $datas = [[id=>1,name="foo",memo="bar"],[id=>2,name="foo",memo="bar"]]
-  function insert_bulk(string $table="", array $datas=[], int $chunkSize = 1000, $timeout=null){
+  function insert_bulk(string $table = "", array $datas = [], int $chunkSize = 0, $timeout=null){
     try{
       if(!$table || !$datas){return;}
       $this->dbh->beginTransaction(); // トランザクション開始
@@ -218,6 +218,7 @@ SQL;
       $res = [];
       $sql_arr = [];
       $latest_id = null;
+      $chunkSize = $chunkSize ? $chunkSize : count($datas); // 一度に挿入するレコード数（デフォルトは全件挿入）
 
       for ($i = 0; $i < $total; $i += $chunkSize) {
         $chunk = array_slice($datas, $i, $chunkSize);
@@ -230,6 +231,7 @@ SQL;
         foreach ($chunk as $row) {
           $placeholders[] = '(' . implode(',', array_fill(0, count($columns), '?')) . ')';
           foreach ($columns as $col) {
+            if($row[$col] === ''){$row[$col] = null;}
             $values[] = $row[$col];
           }
         }
