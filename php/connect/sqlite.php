@@ -292,4 +292,11 @@ SQL;
       "query" => $query,
     ];
   }
+
+   /**
+   * 複数テーブルのトランザクション対応
+   */
+  function multi_table_transaction(array $table_datas=[]){
+
+  }
 }

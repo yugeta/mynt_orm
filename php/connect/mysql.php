@@ -348,50 +348,24 @@ __SQL__;
       $type  = $res ? strtolower($res[0]["Type"]) : null;
     }
     if($res){
-    //   switch (true){
-    //     // 整数
-    //     case preg_match('/^int/i', $type):
-    //       if($value === "" || $value === "null" || $value === null){
-    //         return null;
-    //       }
-    //       else{
-    //         return (int)$value;
-    //       }
-
-    //     // 浮動小数
-    //     case preg_match('/^float|^double|^decimal|^numeric/i', $type):
-    //       if($value === "" || $value === "null"){
-    //         return null;
-    //       }
-    //       else{
-    //         return (float)$value;
-    //       }
-    
-    //     // 文字列
-    //     case preg_match('/^varchar|^char|^text|^tinytext|^mediumtext|^longtext/i', $type):
-    //       return (string)$value ?: null;
-    
-    //     // 日付/時間型
-    //     case preg_match('/^date|^datetime|^timestamp|^time|^year/i', $type):
-    //       return $value ?: null;
-    
-    //     case preg_match('/^tinyint\(1\)/i', $type):
-    //       return $value ? true : false;
-    
-    //     case preg_match('/^blob|^tinyblob|^mediumblob|^longblob/i', $type):
-    //       return $value;
-    
-    //     default:
-    //       return $value;
-    //   }
       switch (true) {
         // boolean (tinyint(1))
         case preg_match('/^tinyint\(1\)$/i', $type):
+          if ($value !== 0 && $value !== 1) {
+            throw new InvalidArgumentException('Invalid boolean value');
+          }
           return (int)$value === 1;
       
         // 整数（int, tinyint, smallint, mediumint, bigint）
-        case preg_match('/^(tinyint|smallint|mediumint|int|bigint)(\(\d+\))?/i', $type):
-          return ($value === "" || $value === "null" || $value === null) ? null : (int)$value;
+        case preg_match('/^(int|tinyint|smallint|mediumint|int|bigint)(\(\d+?\))?/i', $type):
+          // return ($value === "" || $value === "null" || $value === null) ? null : (int)$value;
+          if ($value === "" || $value === "null" || $value === null) {
+            return null; // 空文字列やnullはそのままnullとして扱う
+          }
+          if (!is_numeric($value)) {
+              throw new InvalidArgumentException("Invalid integer value: $value");
+          }
+          return (int)$value;
       
         // 浮動小数（float, double, decimal, numeric）
         case preg_match('/^(float|double|decimal|numeric)(\(\d+,\d+\))?/i', $type):
@@ -415,4 +389,100 @@ __SQL__;
     }
   }
 
+
+  /**
+   * 複数テーブルのトランザクション対応
+   * - insert,update判定も行う。
+   * - バルク処理は行わないので、大量登録の場合は、個別テーブルで行うか独自に処理を書くようにする。
+   * 
+   * [param]
+   * @$table_datas : 複数テーブルの状態を記載
+   * [
+   *   $name  : string : テーブル名
+   *   $data  : $object : カラム毎のテーブルデータ（連想配列データ）
+   *   $where : 書かれている場合、update処理を行うが、where結果が0の場合は、insertを行う。
+   * ], ...
+   */
+  function multi_transaction(array $table_datas=[], $timeout=null){
+    $timeout = $timeout ? $timeout : 1000;
+    $res_arr = [];
+    $sql_arr = [];
+    $last_id_arr = [];
+
+    if (!$this->dbh) {
+      throw new Exception('Database connection is not initialized.');
+    }
+
+    // データが空の場合、または配列じゃ無い場合は処理しない。
+    if($table_datas && count($table_datas)){
+      try{
+        $this->dbh->beginTransaction();
+        
+        for($i=0; $i<count($table_datas); $i++){
+
+          // テーブル毎の送り値整理
+          $table_name = $table_datas[$i]["name"]  ?? null;
+          $table_data = $table_datas[$i]["data"]  ?? null;
+          $where      = $table_datas[$i]["where"] ?? null;
+          if(!$table_name || !$table_data){continue;}
+
+          if($where){
+            $table_data["update_at"] = date("Y-m-d H:i:s");
+          }
+          $keys  = array_keys($table_data);
+
+          // update
+          if($where){
+            $set_queries = implode(",", array_map(function($key){return "{$key} = :{$key}";} , $keys));
+            $query = <<<__SQL__
+UPDATE `{$this->database_name}`.{$table_name}
+SET {$set_queries}
+WHERE {$where}
+__SQL__;
+            $values = $this->conv_values($table_name, $table_data);
+            $pre    = $this->dbh->prepare($query);
+            $exe    = $pre->execute($values);
+            if($exe){
+              $search_query = "SELECT * FROM `{$this->database_name}`.{$table_name} WHERE {$where}";
+              $res_arr[$table_name] = $this->query($search_query);
+            }
+          }
+
+          // insert
+          else{
+            $keys1  = implode(",", array_keys($table_data));
+            $keys2  = implode(",", array_map(function($key){return ":{$key}";} , $keys));
+            $values = $this->conv_values($table_name, $table_data);
+            $query  = <<<SQL
+INSERT INTO `{$this->database_name}`.{$table_name}
+($keys1)
+VALUES
+($keys2)
+SQL;
+            $sql_arr[] = $query;
+            $pre = $this->dbh->prepare($query);
+            $exe = $pre->execute($values);
+            if($exe){
+              $last_id = $this->dbh->lastInsertId();
+              $last_id_arr[$table_name] = $last_id;
+              if($last_id){
+                $res_arr[$table_name] = $this->query("SELECT * FROM `{$this->database_name}`.{$table_name} WHERE id={$last_id}");
+              }
+            }
+          }
+        }
+        $this->dbh->commit();
+      }
+      catch(Exception $e){
+        print_r($e->getMessage());
+        $this->dbh->rollBack();
+        $res_arr = null;
+      }
+    }
+    return [
+      "datas" => $res_arr,
+      "sql"   => $sql_arr,
+      "latest_id" => $last_id_arr,
+    ];
+  }
 }

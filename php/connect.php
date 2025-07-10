@@ -171,4 +171,14 @@ class Connect{
   function delete($table_name=null, $where=null, $timeout=null){
     return $this->sql->delete($table_name, $where, $timeout);
   }
+
+  /**
+   * 複数テーブルにおけるトランザクション対応
+   * [param]
+   * 
+   */
+  function multi_transaction(array $table_datas=[]){
+    return $this->sql->multi_transaction($table_datas);
+  }
+
 }
