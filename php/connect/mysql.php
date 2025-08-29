@@ -142,8 +142,7 @@ SQL;
       $res = $this->dbh->query($query_string);
     }
     catch(Exception $e){
-      echo $query_string . PHP_EOL;
-      // die($e->getMessage());
+      echo $e->getMessage() . PHP_EOL;
       $res = null;
     }
     $datas = [];
