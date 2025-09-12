@@ -161,15 +161,27 @@ SQL;
     return $datas;
   }
 
-  function insert($table="", $hashes=[], $timeout=null){
+  function insert($table = "", $hashes = [], $timeout = null){
     if(!$table || !$hashes){return;}
     $timeout = $timeout ? $timeout : 1000;
-    
-    $keys  = array_keys($hashes);
-    $keys1 = implode(",", array_keys($hashes));
-    $keys2 = implode(",", array_map(function($key){return ":{$key}";} , $keys));
+
+    // カラム名をバッククォートで囲む
+    $keys = array_keys($hashes);
+    $escapedKeys = array_map(function($key){
+        // @@foo → foo に変換
+        $key = preg_replace('/^@@/', '', $key);
+        // セキュリティ: 許可するのは英数字とアンダースコアだけ
+        if(!preg_match('/^[a-zA-Z0-9_]+$/', $key)){
+            throw new Exception("Invalid column name: {$key}");
+        }
+        return "`{$key}`";
+    }, $keys);
+
+    $keys1 = implode(",", $escapedKeys);
+    $keys2 = implode(",", array_map(fn($key) => ":{$key}", $keys));
+
     $query = <<<SQL
-INSERT INTO `{$this->database_name}`.{$table}
+INSERT INTO `{$this->database_name}`.`{$table}`
 ($keys1)
 VALUES
 ($keys2)
@@ -187,11 +199,8 @@ SQL;
         $last_id = $this->dbh->lastInsertId();
         $this->dbh->commit();
         if($last_id){
-          $res = $this->query("SELECT * FROM `{$this->database_name}`.{$table} WHERE id={$last_id}");
+          $res = $this->query("SELECT * FROM `{$this->database_name}`.`{$table}` WHERE id={$last_id}");
         }
-        // else{
-        //   $res = null;
-        // }
       }
     }
     catch(Exception $e){
@@ -199,12 +208,55 @@ SQL;
     }
 
     return [
-      // "data"  => $res ? $res[0] : null,
       "datas" => $res,
       "sql"   => $query,
       "latest_id" => $last_id,
     ];
-  }
+}
+//   function insert($table="", $hashes=[], $timeout=null){
+//     if(!$table || !$hashes){return;}
+//     $timeout = $timeout ? $timeout : 1000;
+    
+//     $keys  = array_keys($hashes);
+//     $keys1 = implode(",", array_keys($hashes));
+//     $keys2 = implode(",", array_map(function($key){return ":{$key}";} , $keys));
+//     $query = <<<SQL
+// INSERT INTO `{$this->database_name}`.{$table}
+// ($keys1)
+// VALUES
+// ($keys2)
+// SQL;
+
+//     $values = $this->conv_values($table, $hashes);
+
+//     try{
+//       $res = null;
+//       $last_id = null;
+//       $this->dbh->beginTransaction();
+//       $pre = $this->dbh->prepare($query);
+//       $exe = $pre->execute($values);
+//       if($exe){
+//         $last_id = $this->dbh->lastInsertId();
+//         $this->dbh->commit();
+//         if($last_id){
+//           $res = $this->query("SELECT * FROM `{$this->database_name}`.{$table} WHERE id={$last_id}");
+//         }
+//         // else{
+//         //   $res = null;
+//         // }
+//       }
+//     }
+//     catch(Exception $e){
+//       $this->dbh->rollBack();
+//     }
+
+//     return [
+//       // "data"  => $res ? $res[0] : null,
+//       "datas" => $res,
+//       "sql"   => $query,
+//       "latest_id" => $last_id,
+//     ];
+//   }
 
   // 大量insertの場合に、まとめて登録できる処理
   // ex) $datas = [[id=>1,name="foo",memo="bar"],[id=>2,name="foo",memo="bar"]]
@@ -265,25 +317,37 @@ SQL;
     ];
   }
 
-  function update($table="", $hashes=[], $where=null, $timeout=null){
+  function update($table = "", $hashes = [], $where = null, $timeout = null){
     if(!isset($hashes["update_at"])){
       $hashes["update_at"] = date("Y-m-d H:i:s");
     }
     if(!$table || !$hashes || !$where){return;}
     $timeout = $timeout ? $timeout : 1000;
 
+    // カラム名をバッククォートで囲む処理
     $keys = array_keys($hashes);
-    $set_queries = implode(",", array_map(function($key){return "{$key} = :{$key}";} , $keys));
+    $escapedKeys = array_map(function($key){
+        // @@foo → foo に変換
+        $key = preg_replace('/^@@/', '', $key);
+        // セキュリティ: 許可するのは英数字とアンダースコアだけ
+        if(!preg_match('/^[a-zA-Z0-9_]+$/', $key)){
+            throw new Exception("Invalid column name: {$key}");
+        }
+        return "`{$key}` = :{$key}";
+    }, $keys);
+
+    $set_queries = implode(",", $escapedKeys);
+
     $query = <<<__SQL__
-UPDATE `{$this->database_name}`.{$table}
+UPDATE `{$this->database_name}`.`{$table}`
 SET {$set_queries}
 WHERE {$where}
 __SQL__;
 
     $values = $this->conv_values($table, $hashes);
 
-    $search_where = $where ? "WHERE {$where}" : "";
-    $search_query = "SELECT * FROM `{$this->database_name}`.{$table} {$search_where}";
+    $search_where  = $where ? "WHERE {$where}" : "";
+    $search_query  = "SELECT * FROM `{$this->database_name}`.`{$table}` {$search_where}";
 
     $res = null;
     try{
@@ -300,18 +364,64 @@ __SQL__;
     }
 
     return [
-      "datas"  => $res ? $res : null,
+      "datas"  => $res ?: null,
       "sql"    => $query,
       "select" => $search_query,
     ];
-  }
+}
+//   function update($table="", $hashes=[], $where=null, $timeout=null){
+//     if(!isset($hashes["update_at"])){
+//       $hashes["update_at"] = date("Y-m-d H:i:s");
+//     }
+//     if(!$table || !$hashes || !$where){return;}
+//     $timeout = $timeout ? $timeout : 1000;
 
-  function delete($table="", $where=null, $timeout=null){
+//     $keys = array_keys($hashes);
+//     $set_queries = implode(",", array_map(function($key){return "{$key} = :{$key}";} , $keys));
+//     $query = <<<__SQL__
+// UPDATE `{$this->database_name}`.{$table}
+// SET {$set_queries}
+// WHERE {$where}
+// __SQL__;
+
+//     $values = $this->conv_values($table, $hashes);
+
+//     $search_where = $where ? "WHERE {$where}" : "";
+//     $search_query = "SELECT * FROM `{$this->database_name}`.{$table} {$search_where}";
+
+//     $res = null;
+//     try{
+//       $this->dbh->beginTransaction();
+//       $pre = $this->dbh->prepare($query);
+//       $exe = $pre->execute($values);
+//       if($exe){
+//         $this->dbh->commit();
+//         $res = $this->query($search_query);
+//       }
+//     }
+//     catch(Exception $e){
+//       $this->dbh->rollBack();
+//     }
+
+//     return [
+//       "datas"  => $res ? $res : null,
+//       "sql"    => $query,
+//       "select" => $search_query,
+//     ];
+//   }
+
+  function delete($table = "", $where = null, $timeout = null){
     if(!$table || !$where){return;}
     $timeout = $timeout ? $timeout : 1000;
 
+    // テーブル名をバッククォートで囲む
+    $table = preg_replace('/^@@/', '', $table);
+    if(!preg_match('/^[a-zA-Z0-9_]+$/', $table)){
+        throw new Exception("Invalid table name: {$table}");
+    }
+
     $query = <<<__SQL__
-DELETE FROM `{$this->database_name}`.{$table}
+DELETE FROM `{$this->database_name}`.`{$table}`
 WHERE {$where}
 __SQL__;
 
@@ -326,9 +436,32 @@ __SQL__;
     }
 
     return [
-      "sql"   => [$query],
+      "sql" => [$query],
     ];
   }
+//   function delete($table="", $where=null, $timeout=null){
+//     if(!$table || !$where){return;}
+//     $timeout = $timeout ? $timeout : 1000;
+
+//     $query = <<<__SQL__
+// DELETE FROM `{$this->database_name}`.{$table}
+// WHERE {$where}
+// __SQL__;
+
+//     try{
+//       $this->dbh->beginTransaction();
+//       $pre = $this->dbh->prepare($query);
+//       $pre->execute();
+//       $this->dbh->commit();
+//     }
+//     catch(Exception $e){
+//       $this->dbh->rollBack();
+//     }
+
+//     return [
+//       "sql"   => [$query],
+//     ];
+//   }
 
   function conv_values($table_name=null, $values=[]){
     foreach($values as $key => $val){
@@ -402,74 +535,98 @@ __SQL__;
    *   $where : 書かれている場合、update処理を行うが、where結果が0の場合は、insertを行う。
    * ], ...
    */
-  function multi_transaction(array $table_datas=[], $timeout=null){
+  function multi_transaction(array $table_datas = [], $timeout = null){
     $timeout = $timeout ? $timeout : 1000;
     $res_arr = [];
     $sql_arr = [];
     $last_id_arr = [];
 
     if (!$this->dbh) {
-      throw new Exception('Database connection is not initialized.');
+        throw new Exception('Database connection is not initialized.');
     }
 
-    // データが空の場合、または配列じゃ無い場合は処理しない。
     if($table_datas && count($table_datas)){
       try{
         $this->dbh->beginTransaction();
-        
-        for($i=0; $i<count($table_datas); $i++){
 
+        foreach ($table_datas as $table_info) {
           // テーブル毎の送り値整理
-          $table_name = $table_datas[$i]["name"]  ?? null;
-          $table_data = $table_datas[$i]["data"]  ?? null;
-          $where      = $table_datas[$i]["where"] ?? null;
+          $table_name = $table_info["name"]  ?? null;
+          $table_data = $table_info["data"]  ?? null;
+          $where      = $table_info["where"] ?? null;
           if(!$table_name || !$table_data){continue;}
 
-          if($where){
-            $table_data["update_at"] = date("Y-m-d H:i:s");
+          // テーブル名を整形
+          $table_name = preg_replace('/^@@/', '', $table_name);
+          if(!preg_match('/^[a-zA-Z0-9_]+$/', $table_name)){
+              throw new Exception("Invalid table name: {$table_name}");
           }
-          $keys  = array_keys($table_data);
+
+          $keys = array_keys($table_data);
+
+          // カラム名をバッククォートで囲む
+          $escapedKeys = array_map(function($key){
+              $key = preg_replace('/^@@/', '', $key);
+              if(!preg_match('/^[a-zA-Z0-9_]+$/', $key)){
+                  throw new Exception("Invalid column name: {$key}");
+              }
+              return $key;
+          }, $keys);
 
           // update
           if($where){
-            $set_queries = implode(",", array_map(function($key){return "{$key} = :{$key}";} , $keys));
+            $table_data["update_at"] = date("Y-m-d H:i:s");
+            $keys = array_keys($table_data);
+
+            $set_queries = implode(",", array_map(function($key){
+                $key = preg_replace('/^@@/', '', $key);
+                if(!preg_match('/^[a-zA-Z0-9_]+$/', $key)){
+                    throw new Exception("Invalid column name: {$key}");
+                }
+                return "`{$key}` = :{$key}";
+            }, $keys));
+
             $query = <<<__SQL__
-UPDATE `{$this->database_name}`.{$table_name}
+UPDATE `{$this->database_name}`.`{$table_name}`
 SET {$set_queries}
 WHERE {$where}
 __SQL__;
+
             $values = $this->conv_values($table_name, $table_data);
             $pre    = $this->dbh->prepare($query);
             $exe    = $pre->execute($values);
             if($exe){
-              $search_query = "SELECT * FROM `{$this->database_name}`.{$table_name} WHERE {$where}";
+              $search_query = "SELECT * FROM `{$this->database_name}`.`{$table_name}` WHERE {$where}";
               $res_arr[$table_name] = $this->query($search_query);
             }
           }
 
           // insert
           else{
-            $keys1  = implode(",", array_keys($table_data));
-            $keys2  = implode(",", array_map(function($key){return ":{$key}";} , $keys));
+            $keys1 = implode(",", array_map(fn($k) => "`".preg_replace('/^@@/', '', $k)."`", $keys));
+            $keys2 = implode(",", array_map(fn($k) => ":".preg_replace('/^@@/', '', $k), $keys));
             $values = $this->conv_values($table_name, $table_data);
-            $query  = <<<SQL
-INSERT INTO `{$this->database_name}`.{$table_name}
+
+            $query = <<<SQL
+INSERT INTO `{$this->database_name}`.`{$table_name}`
 ($keys1)
 VALUES
 ($keys2)
 SQL;
             $sql_arr[] = $query;
+
             $pre = $this->dbh->prepare($query);
             $exe = $pre->execute($values);
             if($exe){
               $last_id = $this->dbh->lastInsertId();
               $last_id_arr[$table_name] = $last_id;
               if($last_id){
-                $res_arr[$table_name] = $this->query("SELECT * FROM `{$this->database_name}`.{$table_name} WHERE id={$last_id}");
+                $res_arr[$table_name] = $this->query("SELECT * FROM `{$this->database_name}`.`{$table_name}` WHERE id={$last_id}");
               }
             }
           }
         }
+
         $this->dbh->commit();
       }
       catch(Exception $e){
@@ -478,10 +635,93 @@ SQL;
         $res_arr = null;
       }
     }
+
     return [
-      "datas" => $res_arr,
-      "sql"   => $sql_arr,
+      "datas"     => $res_arr,
+      "sql"       => $sql_arr,
       "latest_id" => $last_id_arr,
     ];
-  }
+}
+//   function multi_transaction(array $table_datas=[], $timeout=null){
+//     $timeout = $timeout ? $timeout : 1000;
+//     $res_arr = [];
+//     $sql_arr = [];
+//     $last_id_arr = [];
+
+//     if (!$this->dbh) {
+//       throw new Exception('Database connection is not initialized.');
+//     }
+
+//     // データが空の場合、または配列じゃ無い場合は処理しない。
+//     if($table_datas && count($table_datas)){
+//       try{
+//         $this->dbh->beginTransaction();
+        
+//         for($i=0; $i<count($table_datas); $i++){
+
+//           // テーブル毎の送り値整理
+//           $table_name = $table_datas[$i]["name"]  ?? null;
+//           $table_data = $table_datas[$i]["data"]  ?? null;
+//           $where      = $table_datas[$i]["where"] ?? null;
+//           if(!$table_name || !$table_data){continue;}
+
+//           if($where){
+//             $table_data["update_at"] = date("Y-m-d H:i:s");
+//           }
+//           $keys  = array_keys($table_data);
+
+//           // update
+//           if($where){
+//             $set_queries = implode(",", array_map(function($key){return "{$key} = :{$key}";} , $keys));
+//             $query = <<<__SQL__
+// UPDATE `{$this->database_name}`.{$table_name}
+// SET {$set_queries}
+// WHERE {$where}
+// __SQL__;
+//             $values = $this->conv_values($table_name, $table_data);
+//             $pre    = $this->dbh->prepare($query);
+//             $exe    = $pre->execute($values);
+//             if($exe){
+//               $search_query = "SELECT * FROM `{$this->database_name}`.{$table_name} WHERE {$where}";
+//               $res_arr[$table_name] = $this->query($search_query);
+//             }
+//           }
+
+//           // insert
+//           else{
+//             $keys1  = implode(",", array_keys($table_data));
+//             $keys2  = implode(",", array_map(function($key){return ":{$key}";} , $keys));
+//             $values = $this->conv_values($table_name, $table_data);
+//             $query  = <<<SQL
+// INSERT INTO `{$this->database_name}`.{$table_name}
+// ($keys1)
+// VALUES
+// ($keys2)
+// SQL;
+//             $sql_arr[] = $query;
+//             $pre = $this->dbh->prepare($query);
+//             $exe = $pre->execute($values);
+//             if($exe){
+//               $last_id = $this->dbh->lastInsertId();
+//               $last_id_arr[$table_name] = $last_id;
+//               if($last_id){
+//                 $res_arr[$table_name] = $this->query("SELECT * FROM `{$this->database_name}`.{$table_name} WHERE id={$last_id}");
+//               }
+//             }
+//           }
+//         }
+//         $this->dbh->commit();
+//       }
+//       catch(Exception $e){
+//         print_r($e->getMessage());
+//         $this->dbh->rollBack();
+//         $res_arr = null;
+//       }
+//     }
+//     return [
+//       "datas" => $res_arr,
+//       "sql"   => $sql_arr,
+//       "latest_id" => $last_id_arr,
+//     ];
+//   }
 }
