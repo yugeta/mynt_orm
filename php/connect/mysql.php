@@ -273,9 +273,9 @@ SQL;
   }
 
   function update($table = "", $hashes = [], $where = null, $timeout = null){
-    if(!isset($hashes["update_at"])){
-      $hashes["update_at"] = date("Y-m-d H:i:s");
-    }
+    // if(!isset($hashes["update_at"])){
+    //   $hashes["update_at"] = date("Y-m-d H:i:s");
+    // }
     if(!$table || !$hashes || !$where){return;}
     $timeout = $timeout ? $timeout : 1000;
 
@@ -457,18 +457,18 @@ __SQL__;
 
           $keys = array_keys($table_data);
 
-          // カラム名をバッククォートで囲む
-          $escapedKeys = array_map(function($key){
-              $key = preg_replace('/^@@/', '', $key);
-              if(!preg_match('/^[a-zA-Z0-9_]+$/', $key)){
-                  throw new Exception("Invalid column name: {$key}");
-              }
-              return $key;
-          }, $keys);
+          // // カラム名をバッククォートで囲む
+          // $escapedKeys = array_map(function($key){
+          //     $key = preg_replace('/^@@/', '', $key);
+          //     if(!preg_match('/^[a-zA-Z0-9_]+$/', $key)){
+          //         throw new Exception("Invalid column name: {$key}");
+          //     }
+          //     return $key;
+          // }, $keys);
 
           // update
           if($where){
-            $table_data["update_at"] = date("Y-m-d H:i:s");
+            // $table_data["update_at"] = date("Y-m-d H:i:s");
             $keys = array_keys($table_data);
 
             $set_queries = implode(",", array_map(function($key){
@@ -498,34 +498,34 @@ __SQL__;
           else{
             $keys1 = implode(",", array_map(fn($k) => "`".preg_replace('/^@@/', '', $k)."`", $keys));
             $keys2 = implode(",", array_map(fn($k) => ":".preg_replace('/^@@/', '', $k), $keys));
-            $values = $this->conv_values($table_name, $table_data);
-
+            // $keys2 = implode(",", array_map(fn($k) => ":{$k}", $keys));
             $query = <<<SQL
 INSERT INTO `{$this->database_name}`.`{$table_name}`
 ($keys1)
 VALUES
 ($keys2)
 SQL;
-            $sql_arr[] = $query;
-
-            $pre = $this->dbh->prepare($query);
-            $exe = $pre->execute($values);
-            if($exe){
-              $last_id = $this->dbh->lastInsertId();
-              $last_id_arr[$table_name] = $last_id;
-              if($last_id){
-                $res_arr[$table_name] = $this->query("SELECT * FROM `{$this->database_name}`.`{$table_name}` WHERE id={$last_id}");
-              }
-            }
+            // $sql_arr[] = $query;
+            $values = $this->conv_values($table_name, $table_data);
+            $pre    = $this->dbh->prepare($query);
+            $exe    = $pre->execute($values);
+            // if($exe){
+            //   $last_id = $this->dbh->lastInsertId();
+            //   $last_id_arr[] = $last_id;
+            //   if($last_id){
+            //     $res_arr[] = $this->query("SELECT * FROM `{$this->database_name}`.`{$table_name}` WHERE id={$last_id}");
+            //   }
+            // }
           }
         }
 
         $this->dbh->commit();
       }
       catch(Exception $e){
-        print_r($e->getMessage());
+        // print_r($e->getMessage());
         $this->dbh->rollBack();
-        $res_arr = null;
+        throw $e;
+        // $res_arr = null;
       }
     }
 
