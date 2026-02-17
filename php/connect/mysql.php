@@ -381,11 +381,39 @@ __SQL__;
 
         // boolean (tinyint(1))
         case preg_match('/^tinyint\(1\)$/i', $type):
-          if ($value !== 0 && $value !== 1) {
-            throw new InvalidArgumentException('Invalid boolean value');
+          if(is_int($value)){
+            return $value;
           }
-          return (int)$value === 1;
+
+          if($value === null || $value = ""){
+            return null;
+          }
+
+          // すでに bool
+          else if (is_bool($value)) {
+            return $value ? 1 : 0;
+          }
+
+          // 数値または数値文字列
+          else if (is_int($value)) {
+          // else if (is_int($value) || ctype_digit((string)$value)) {
+            return $value;
+          }
+
+          // 文字列の true / false
+          if (is_string($value)) {
+            $v = strtolower($value);
+            if ($v === 'true') return 1;
+            if ($v === 'false') return 0;
+            if ($v === 'null') return null;
+
+            $int = (int)$value;
+            if (is_int($int)) return $int;
+          }
+
+          throw new InvalidArgumentException('Invalid boolean value');
       
+
         // 整数（int, tinyint, smallint, mediumint, bigint）
         case preg_match('/^(int|tinyint|smallint|mediumint|int|bigint)(\(\d+?\))?/i', $type):
           if ($value === "" || $value === "null" || $value === null) {
