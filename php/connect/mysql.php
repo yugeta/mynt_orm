@@ -379,13 +379,13 @@ __SQL__;
         case preg_match('/^(varchar|char|text|tinytext|mediumtext|longtext)/i', $type):
           return ($value === "" || $value === "null" || $value === null) ? null : (string)$value;
 
-        // boolean (tinyint(1))
-        case preg_match('/^tinyint\(1\)$/i', $type):
+        //  tinyint ? boolean
+        case preg_match('/^tinyint\(\d+?\)$/i', $type):
           if(is_int($value)){
             return $value;
           }
 
-          if($value === null || $value = ""){
+          if($value === null || $value === ""){
             return null;
           }
 
@@ -406,16 +406,16 @@ __SQL__;
             if ($v === 'true') return 1;
             if ($v === 'false') return 0;
             if ($v === 'null') return null;
-
+            
             $int = (int)$value;
             if (is_int($int)) return $int;
           }
 
           throw new InvalidArgumentException('Invalid boolean value');
-      
+          break;
 
         // 整数（int, tinyint, smallint, mediumint, bigint）
-        case preg_match('/^(int|tinyint|smallint|mediumint|int|bigint)(\(\d+?\))?/i', $type):
+        case preg_match('/^(int|smallint|mediumint|int|bigint)(\(\d+?\))?/i', $type):
           if ($value === "" || $value === "null" || $value === null) {
             return null; // 空文字列やnullはそのままnullとして扱う
           }
